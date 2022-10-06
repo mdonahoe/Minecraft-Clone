@@ -5,8 +5,6 @@ onready var Chunk = load("res://Chunk.gd")
 
 # Thread variables No reason to declare these on startup just do it up here
 var thread = Thread.new()
-var mutex = Mutex.new()
-var semaphore = Semaphore.new()
 var bKill_thread = false
 
 #Use this when adding/removing from the chunk array/dict
@@ -29,8 +27,17 @@ func _ready():
 
 func _thread_gen(userdata):
 	var i = 0
+	var loop_counter = 0
 	# Center map generation on the player
+	var start_loop_time = Time.get_ticks_usec()
 	while(!bKill_thread):
+		var now = Time.get_ticks_usec()
+		var dt = now - start_loop_time
+		if dt > 1000000:
+			var loops_per_sec = loop_counter * 1000000.0 / dt
+			print("fps = %f" % loops_per_sec)
+			loop_counter = 0
+			start_loop_time = now
 		# Check if player in new chunk
 		var player_pos_updated = false
 		player_pos_updated = _new_chunk_pos != _chunk_pos
@@ -38,7 +45,8 @@ func _thread_gen(userdata):
 		# Make sure we aren't making a shallow copy
 		_chunk_pos = Vector2(_new_chunk_pos.x, _new_chunk_pos.y)
 		var current_chunk_pos = Vector2(_new_chunk_pos.x, _new_chunk_pos.y)
-		i = i + 1
+		i += 1
+		loop_counter += 1
 		if player_pos_updated:
 			# If new chunk unload unneeded chunks (changed to be entirely done off main thread if I understand correctly, fixling some stuttering I was feeling
 			enforce_render_distance(current_chunk_pos)
@@ -89,8 +97,11 @@ func change_block(cx, cz, bx, by, bz, t):
 		_update_chunk(cx, cz)
 
 func _load_chunk(cx, cz):
+	cx = clamp(cx, -1, 1)
+	cz = clamp(cz, -1, 1)
 	var c_pos = Vector2(cx, cz)
 	if not _loaded_chunks.has(c_pos):
+		print("creating new chunk %d %d" % [cx, cz])
 		var c = Chunk.new()
 		c.generate(self, cx, cz)
 		c.update()
@@ -114,12 +125,15 @@ func enforce_render_distance(current_chunk_pos):
 		# Anywhere you directly interface with chunks outside of unloading
 		if abs(v.x - current_chunk_pos.x) > load_radius or abs(v.y - current_chunk_pos.y) > load_radius:
 			chunk_mutex.lock()
+			print("erasing chunk %d %d" % [v.x, v.y])
 			_loaded_chunks[v].free()
 			_loaded_chunks.erase(v)
 			chunk_mutex.unlock()
 
 
 func _unload_chunk(cx, cz):
+	# TODO(matt): Is this ever called?
+	print("unloading chunk %d %d" % [cx, cz])
 	var c_pos = Vector2(cx, cz)
 	if _loaded_chunks.has(c_pos):
 		chunk_mutex.lock()

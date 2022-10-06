@@ -27,7 +27,7 @@ func _ready():
 
 func _process(delta):
 	# Check the players chunk position and see if it has changed
-	if player != null and pw != null and pw.mutex != null:
+	if player != null and pw != null and pw.chunk_mutex != null:
 		var player_pos = player.translation
 		var chunk_x = floor(player.translation.x / Chunk.DIMENSION.x)
 		var chunk_z = floor(player.translation.z / Chunk.DIMENSION.z)
